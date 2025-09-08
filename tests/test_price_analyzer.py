@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import tempfile
 import os
+import shutil
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 import sys
@@ -49,7 +50,7 @@ class TestPriceAnalyzer(unittest.TestCase):
         # Remove temporary files
         if os.path.exists(self.excel_path):
             os.remove(self.excel_path)
-        os.rmdir(self.temp_dir)
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_init(self):
         """Test PriceAnalyzer initialization."""
@@ -376,7 +377,7 @@ class TestPriceAnalyzerIntegration(unittest.TestCase):
         """Clean up integration test fixtures."""
         if os.path.exists(self.excel_path):
             os.remove(self.excel_path)
-        os.rmdir(self.temp_dir)
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_full_analysis_workflow(self):
         """Test complete analysis workflow."""

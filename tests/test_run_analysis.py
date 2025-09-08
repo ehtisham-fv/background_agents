@@ -6,6 +6,7 @@ Integration tests for the run_analysis.py script.
 import unittest
 import tempfile
 import os
+import shutil
 import sys
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -42,12 +43,7 @@ class TestRunAnalysisScript(unittest.TestCase):
 
     def _cleanup_temp_dir(self):
         """Helper method to clean up temp directory."""
-        for root, dirs, files in os.walk(self.temp_dir, topdown=False):
-            for file in files:
-                os.remove(os.path.join(root, file))
-            for dir in dirs:
-                os.rmdir(os.path.join(root, dir))
-        os.rmdir(self.temp_dir)
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def create_test_excel_file(self):
         """Create a test Excel file for testing."""
@@ -218,12 +214,7 @@ class TestRunAnalysisCommandLine(unittest.TestCase):
 
     def _cleanup_temp_dir(self):
         """Helper method to clean up temp directory."""
-        for root, dirs, files in os.walk(self.temp_dir, topdown=False):
-            for file in files:
-                os.remove(os.path.join(root, file))
-            for dir in dirs:
-                os.rmdir(os.path.join(root, dir))
-        os.rmdir(self.temp_dir)
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def create_test_data(self):
         """Create test data files."""
@@ -317,12 +308,7 @@ class TestRunAnalysisIntegration(unittest.TestCase):
 
     def _cleanup_temp_dir(self):
         """Helper method to clean up temp directory."""
-        for root, dirs, files in os.walk(self.temp_dir, topdown=False):
-            for file in files:
-                os.remove(os.path.join(root, file))
-            for dir in dirs:
-                os.rmdir(os.path.join(root, dir))
-        os.rmdir(self.temp_dir)
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     @patch('builtins.print')
     def test_full_integration_workflow(self, mock_print):

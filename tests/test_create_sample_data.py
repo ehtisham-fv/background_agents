@@ -7,6 +7,7 @@ import unittest
 import pandas as pd
 import tempfile
 import os
+import shutil
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 import sys
@@ -29,14 +30,7 @@ class TestCreateSampleData(unittest.TestCase):
     def tearDown(self):
         """Clean up test fixtures."""
         os.chdir(self.original_cwd)
-        # Clean up temp directory
-        for file in os.listdir(self.temp_dir):
-            file_path = os.path.join(self.temp_dir, file)
-            if os.path.isfile(file_path):
-                os.remove(file_path)
-            elif os.path.isdir(file_path):
-                os.rmdir(file_path)
-        os.rmdir(self.temp_dir)
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     @patch('builtins.print')
     def test_create_sample_data_creates_file(self, mock_print):
@@ -206,14 +200,7 @@ class TestCreateSampleDataEdgeCases(unittest.TestCase):
     def tearDown(self):
         """Clean up test fixtures."""
         os.chdir(self.original_cwd)
-        # Clean up temp directory
-        for file in os.listdir(self.temp_dir):
-            file_path = os.path.join(self.temp_dir, file)
-            if os.path.isfile(file_path):
-                os.remove(file_path)
-            elif os.path.isdir(file_path):
-                os.rmdir(file_path)
-        os.rmdir(self.temp_dir)
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     @patch('pandas.DataFrame.to_excel')
     def test_create_sample_data_write_error(self, mock_to_excel):
