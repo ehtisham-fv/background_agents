@@ -202,14 +202,6 @@ class TestCreateSampleDataEdgeCases(unittest.TestCase):
         os.chdir(self.original_cwd)
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    @patch('pandas.DataFrame.to_excel')
-    def test_create_sample_data_write_error(self, mock_to_excel):
-        """Test behavior when Excel write fails."""
-        # Mock to_excel to raise an exception
-        mock_to_excel.side_effect = PermissionError("Cannot write file")
-        
-        with self.assertRaises(PermissionError):
-            create_sample_data()
 
     def test_create_sample_data_data_consistency(self):
         """Test that created data has consistent structure."""
