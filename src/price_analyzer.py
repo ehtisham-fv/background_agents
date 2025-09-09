@@ -86,11 +86,12 @@ class PriceAnalyzer:
             self.tabelle1_data['price'] = (
                 self.tabelle1_data['price']
                 .astype(str)
-                .str.replace(r'[€$£¥,\s]', '', regex=True)  # Remove currency symbols and spaces
+                .str.replace(r'[€$£¥\s]', '', regex=True)  # Remove currency symbols and spaces (but not comma)
                 .str.replace(',', '.')  # Replace comma with dot for decimal
                 .replace('', np.nan)  # Replace empty strings with NaN
-                .astype(float)
             )
+            # Convert to numeric, coercing errors to NaN
+            self.tabelle1_data['price'] = pd.to_numeric(self.tabelle1_data['price'], errors='coerce')
             
             # Remove rows with missing article numbers or prices
             self.tabelle1_data = self.tabelle1_data.dropna(subset=['article_number', 'price'])
@@ -118,11 +119,12 @@ class PriceAnalyzer:
             self.bestand_data['price'] = (
                 self.bestand_data['price']
                 .astype(str)
-                .str.replace(r'[€$£¥,\s]', '', regex=True)
+                .str.replace(r'[€$£¥\s]', '', regex=True)  # Remove currency symbols and spaces (but not comma)
                 .str.replace(',', '.')
                 .replace('', np.nan)
-                .astype(float)
             )
+            # Convert to numeric, coercing errors to NaN
+            self.bestand_data['price'] = pd.to_numeric(self.bestand_data['price'], errors='coerce')
             
             # Remove rows with missing article numbers or prices
             self.bestand_data = self.bestand_data.dropna(subset=['article_number', 'price'])

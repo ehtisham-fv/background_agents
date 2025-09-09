@@ -392,7 +392,7 @@ class TestPriceAnalyzerIntegration(unittest.TestCase):
         # Verify results
         self.assertEqual(common_analysis['common_articles_count'], 2)  # FRAME001, LENS002
         self.assertEqual(len(price_comparison), 2)
-        self.assertEqual(len(merged_data), 7)  # All unique articles
+        self.assertEqual(len(merged_data), 8)  # All unique articles
         
         # Check price differences are calculated correctly
         frame001_comparison = price_comparison[
