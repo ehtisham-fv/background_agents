@@ -96,6 +96,16 @@ class PriceAnalyzer:
             self.tabelle1_data = self.tabelle1_data.dropna(subset=['article_number', 'price'])
             self.tabelle1_data = self.tabelle1_data[self.tabelle1_data['article_number'] != '']
             
+            # Handle duplicates: keep only the entry with the lowest price for each article
+            initial_count = len(self.tabelle1_data)
+            self.tabelle1_data = self.tabelle1_data.loc[
+                self.tabelle1_data.groupby('article_number')['price'].idxmin()
+            ].reset_index(drop=True)
+            duplicates_removed = initial_count - len(self.tabelle1_data)
+            
+            if duplicates_removed > 0:
+                logger.info(f"Removed {duplicates_removed} duplicate entries from Tabelle1, keeping lowest prices")
+            
             logger.info(f"Tabelle1 after cleaning: {len(self.tabelle1_data)} rows")
         
         # Clean Bestand Odoo data
@@ -130,6 +140,129 @@ class PriceAnalyzer:
             
             logger.info(f"Bestand Odoo after cleaning: {len(self.bestand_data)} rows")
     
+    def analyze_duplicates_within_sheets(self) -> Dict[str, Any]:
+        """Analyzes duplicates within each sheet for price variations."""
+        logger.info("Analyzing duplicates within each sheet...")
+        
+        # Analyze duplicates in Tabelle1 (using original column names)
+        tabelle1_duplicates = self._analyze_sheet_duplicates_raw(
+            self.tabelle1_data, 'Tabelle1', 'Artnr', 'Fielmann EK'
+        )
+        
+        # Analyze duplicates in Bestand Odoo (using original column names)
+        bestand_duplicates = self._analyze_sheet_duplicates_raw(
+            self.bestand_data, 'Bestand Odoo', 'Interne Referenz', 'Kosten'
+        )
+        
+        return {
+            'tabelle1': tabelle1_duplicates,
+            'bestand_odoo': bestand_duplicates
+        }
+
+    def _analyze_sheet_duplicates_raw(self, df: pd.DataFrame, sheet_name: str, 
+                                     article_col: str, price_col: str) -> Dict[str, Any]:
+        """Helper function to analyze duplicates in a single dataframe with original column names."""
+        if df is None:
+            return {'total_duplicates': 0, 'duplicates_with_price_diff': 0, 'details': []}
+        
+        # Clean the data for analysis (similar to clean_data but without modifying the original)
+        df_clean = df.copy()
+        
+        # Clean article numbers
+        df_clean[article_col] = (
+            df_clean[article_col]
+            .astype(str)
+            .str.strip()
+            .str.replace(r'[^\w\-]', '', regex=True)
+        )
+        
+        # Clean prices
+        df_clean[price_col] = (
+            df_clean[price_col]
+            .astype(str)
+            .str.replace(r'[€$£¥,\s]', '', regex=True)
+            .str.replace(',', '.')
+            .replace('', np.nan)
+            .astype(float)
+        )
+        
+        # Remove rows with missing article numbers or prices
+        df_clean = df_clean.dropna(subset=[article_col, price_col])
+        df_clean = df_clean[df_clean[article_col] != '']
+        
+        # Find all rows with duplicated article numbers
+        duplicates = df_clean[df_clean[article_col].duplicated(keep=False)]
+        
+        if duplicates.empty:
+            logger.info(f"No duplicates found in {sheet_name}")
+            return {'total_duplicates': 0, 'duplicates_with_price_diff': 0, 'details': []}
+
+        total_duplicates = duplicates[article_col].nunique()
+        
+        # Group by article number and check for price variations
+        price_diff_details = []
+        duplicates_with_price_diff = 0
+        
+        for article, group in duplicates.groupby(article_col):
+            if group[price_col].nunique() > 1:
+                duplicates_with_price_diff += 1
+                price_diff_details.append({
+                    'article_number': article,
+                    'prices': sorted(list(group[price_col].unique())),
+                    'price_mean': group[price_col].mean(),
+                    'price_std': group[price_col].std(),
+                    'price_min': group[price_col].min(),
+                    'price_max': group[price_col].max(),
+                })
+                
+        logger.info(f"Found {total_duplicates} articles with duplicates in {sheet_name}.")
+        logger.info(f"{duplicates_with_price_diff} of them have different prices.")
+        
+        return {
+            'total_duplicates': total_duplicates,
+            'duplicates_with_price_diff': duplicates_with_price_diff,
+            'details': price_diff_details
+        }
+
+    def _analyze_sheet_duplicates(self, df: pd.DataFrame, sheet_name: str) -> Dict[str, Any]:
+        """Helper function to analyze duplicates in a single dataframe."""
+        if df is None:
+            return {'total_duplicates': 0, 'duplicates_with_price_diff': 0, 'details': []}
+        
+        # Find all rows with duplicated article numbers
+        duplicates = df[df['article_number'].duplicated(keep=False)]
+        
+        if duplicates.empty:
+            logger.info(f"No duplicates found in {sheet_name}")
+            return {'total_duplicates': 0, 'duplicates_with_price_diff': 0, 'details': []}
+
+        total_duplicates = duplicates['article_number'].nunique()
+        
+        # Group by article number and check for price variations
+        price_diff_details = []
+        duplicates_with_price_diff = 0
+        
+        for article, group in duplicates.groupby('article_number'):
+            if group['price'].nunique() > 1:
+                duplicates_with_price_diff += 1
+                price_diff_details.append({
+                    'article_number': article,
+                    'prices': sorted(list(group['price'].unique())),
+                    'price_mean': group['price'].mean(),
+                    'price_std': group['price'].std(),
+                    'price_min': group['price'].min(),
+                    'price_max': group['price'].max(),
+                })
+                
+        logger.info(f"Found {total_duplicates} articles with duplicates in {sheet_name}.")
+        logger.info(f"{duplicates_with_price_diff} of them have different prices.")
+        
+        return {
+            'total_duplicates': total_duplicates,
+            'duplicates_with_price_diff': duplicates_with_price_diff,
+            'details': price_diff_details
+        }
+
     def analyze_common_articles(self) -> Dict[str, Any]:
         """Analyze common articles between both sheets."""
         logger.info("Analyzing common articles...")
@@ -263,7 +396,7 @@ class PriceAnalyzer:
             logger.error(f"Error saving results: {str(e)}")
             raise
     
-    def generate_analytics_report(self, price_comparison: pd.DataFrame) -> None:
+    def generate_analytics_report(self, price_comparison: pd.DataFrame, duplicate_analysis: Dict[str, Any]) -> None:
         """Generate and display analytics report."""
         logger.info("Generating analytics report...")
         
@@ -298,12 +431,36 @@ class PriceAnalyzer:
             for _, row in top_decreases.iterrows():
                 print(f"   • {row['article_number']}: €{row['bestand_price']:.2f} → €{row['tabelle1_price']:.2f} ({row['price_difference']:.2f}, {row['price_difference_pct']:.1f}%)")
         
+        # Duplicate analysis
+        print(f"\n🔬 DUPLICATE ANALYSIS:")
+        
+        # Tabelle1 duplicate report
+        tabelle1_dupes = duplicate_analysis['tabelle1']
+        print(f"\n   --- Tabelle1 Duplicates (Before Cleaning) ---")
+        print(f"   • Articles with duplicates found: {tabelle1_dupes['total_duplicates']:,}")
+        print(f"   • Duplicates with price differences: {tabelle1_dupes['duplicates_with_price_diff']:,}")
+        if tabelle1_dupes['duplicates_with_price_diff'] > 0:
+            print("   • Articles with price differences (lowest price was kept):")
+            for detail in tabelle1_dupes['details'][:5]:
+                prices_str = ", ".join([f"€{p:.2f}" for p in detail['prices']])
+                print(f"     - {detail['article_number']}: Prices [{prices_str}] → Kept: €{detail['price_min']:.2f}")
+        print(f"   • Resolution: Duplicates removed, lowest prices retained")
+
+        # Bestand Odoo duplicate report
+        bestand_dupes = duplicate_analysis['bestand_odoo']
+        print(f"\n   --- Bestand Odoo Duplicates ---")
+        print(f"   • Articles with duplicates: {bestand_dupes['total_duplicates']:,}")
+        print(f"   • Duplicates with price differences: {bestand_dupes['duplicates_with_price_diff']:,}")
+        if bestand_dupes['duplicates_with_price_diff'] > 0:
+            print("   • Top 5 articles with price differences:")
+            for detail in bestand_dupes['details'][:5]:
+                prices_str = ", ".join([f"€{p:.2f}" for p in detail['prices']])
+                print(f"     - {detail['article_number']}: Prices [{prices_str}]")
+        
         # Data quality
         print(f"\n🔍 DATA QUALITY:")
         print(f"   • Missing prices in Tabelle1: {self.tabelle1_data['price'].isna().sum()}")
         print(f"   • Missing prices in Bestand Odoo: {self.bestand_data['price'].isna().sum()}")
-        print(f"   • Duplicate articles in Tabelle1: {self.tabelle1_data['article_number'].duplicated().sum()}")
-        print(f"   • Duplicate articles in Bestand Odoo: {self.bestand_data['article_number'].duplicated().sum()}")
         
         print("\n" + "="*60)
 
@@ -319,6 +476,10 @@ def main():
         
         # Load and clean data
         analyzer.load_data()
+        
+        # Analyze duplicates within each sheet (before cleaning to capture original duplicates)
+        duplicate_analysis = analyzer.analyze_duplicates_within_sheets()
+        
         analyzer.clean_data()
         
         # Analyze common articles
@@ -334,7 +495,7 @@ def main():
         analyzer.save_results(output_path)
         
         # Generate analytics report
-        analyzer.generate_analytics_report(price_comparison)
+        analyzer.generate_analytics_report(price_comparison, duplicate_analysis)
         
         logger.info("Analysis completed successfully!")
         
